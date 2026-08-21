@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#07080d" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta
+      name="description"
+      content="Private HobbyHush owner cockpit prototype with synthetic data only."
+    />
+    <title>HobbyHush · Owner cockpit</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to dashboard</a>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Owner cockpit navigation">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">
+            <span>H</span><i></i>
+          </div>
+          <div>
+            <p class="brand-name">HobbyHush</p>
+            <p class="brand-subtitle">Owner cockpit</p>
+          </div>
+        </div>
+
+        <nav class="side-nav" aria-label="Dashboard sections">
+          <a class="nav-link is-active" href="#overview" aria-current="page">
+            <span class="nav-icon" aria-hidden="true">⌁</span>
+            Overview
+          </a>
+          <a class="nav-link" href="#content">
+            <span class="nav-icon" aria-hidden="true">◇</span>
+            Content
+          </a>
+          <a class="nav-link" href="#growth">
+            <span class="nav-icon" aria-hidden="true">↗</span>
+            Growth
+          </a>
+          <a class="nav-link" href="#quality">
+            <span class="nav-icon" aria-hidden="true">✓</span>
+            Quality gates
+          </a>
+        </nav>
+
+        <div class="privacy-card">
+          <span class="privacy-icon" aria-hidden="true">●</span>
+          <div>
+            <p>Analytics remain off</p>
+            <span>No tracking is connected to this prototype or the shipped app.</span>
+          </div>
+        </div>
+
+        <p class="sidebar-foot">Private workspace · Burgener Studio</p>
+      </aside>
+
+      <main class="main" id="main-content" tabindex="-1">
+        <header class="topbar">
+          <div class="title-block">
+            <p class="eyebrow">Product pulse</p>
+            <h1>Know what to improve next.</h1>
+            <p id="range-summary" class="range-summary">Last 30 days · Synthetic preview</p>
+          </div>
+
+          <div class="top-actions">
+            <span class="demo-badge" title="All figures are fictional">
+              <i aria-hidden="true"></i>
+              Demo data
+            </span>
+            <label class="select-control">
+              <span class="sr-only">Data scenario</span>
+              <select id="scenario-select" aria-label="Data scenario">
+                <option value="healthy">Healthy growth</option>
+                <option value="launch">Launch week</option>
+                <option value="attention">Needs attention</option>
+              </select>
+            </label>
+            <label class="select-control compact">
+              <span class="sr-only">Reporting period</span>
+              <select id="period-select" aria-label="Reporting period">
+                <option value="7">7 days</option>
+                <option value="30" selected>30 days</option>
+                <option value="90">90 days</option>
+              </select>
+            </label>
+            <button class="button button-primary" type="button" id="open-import">
+              <span aria-hidden="true">＋</span>
+              Import Play CSV
+            </button>
+          </div>
+        </header>
+
+        <section class="source-strip" aria-label="Data source status">
+          <div class="source-item">
+            <span class="source-dot dot-play" aria-hidden="true"></span>
+            <span><strong>Google Play</strong><small id="play-source-label">Synthetic snapshot</small></span>
+          </div>
+          <div class="source-divider" aria-hidden="true"></div>
+          <div class="source-item">
+            <span class="source-dot dot-product" aria-hidden="true"></span>
+            <span><strong>Product events</strong><small>Fixture only · endpoint disabled</small></span>
+          </div>
+          <div class="source-divider" aria-hidden="true"></div>
+          <div class="source-item source-item-grow">
+            <span class="source-dot dot-private" aria-hidden="true"></span>
+            <span><strong>Privacy boundary</strong><small>Installations, groups and rounds — never people</small></span>
+          </div>
+          <label class="state-preview">
+            <span>Preview state</span>
+            <select id="state-select" aria-label="Preview dashboard state">
+              <option value="ready">Ready</option>
+              <option value="loading">Loading</option>
+              <option value="empty">Empty</option>
+              <option value="error">Error</option>
+            </select>
+          </label>
+        </section>
+
+        <div id="status-announcer" class="sr-only" role="status" aria-live="polite"></div>
+        <div id="dashboard-root" aria-busy="true">
+          <section class="skeleton-grid" aria-label="Loading dashboard">
+            <div class="skeleton skeleton-hero"></div>
+            <div class="skeleton skeleton-kpis"></div>
+            <div class="skeleton skeleton-panel"></div>
+            <div class="skeleton skeleton-panel"></div>
+          </section>
+        </div>
+
+        <footer class="footer-note">
+          <span>Prototype v0.1</span>
+          <span aria-hidden="true">·</span>
+          <span>Refresh target: daily</span>
+          <span aria-hidden="true">·</span>
+          <span>Aggregate cohorts ≥ 5</span>
+        </footer>
+      </main>
+    </div>
+
+    <dialog id="csv-dialog" class="dialog" aria-labelledby="dialog-title">
+      <form method="dialog" class="dialog-card">
+        <button class="dialog-close" type="submit" aria-label="Close dialog">×</button>
+        <div class="dialog-icon" aria-hidden="true">CSV</div>
+        <p class="eyebrow">Local import</p>
+        <h2 id="dialog-title">Add a Google Play snapshot</h2>
+        <p class="dialog-copy">
+          Choose a Statistics CSV exported from Play Console. It is parsed in this browser tab,
+          never uploaded, and discarded when the page closes.
+        </p>
+        <label class="drop-zone" for="csv-file" id="drop-zone">
+          <span class="drop-icon" aria-hidden="true">⇧</span>
+          <strong>Choose CSV file</strong>
+          <span>or drop it here · max 5 MB</span>
+          <input id="csv-file" type="file" accept=".csv,text/csv" />
+        </label>
+        <p id="import-feedback" class="import-feedback" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <a class="button button-ghost" href="./sample-play-export.csv" download>
+            Download sample
+          </a>
+          <button class="button button-subtle" type="submit">Cancel</button>
+        </div>
+        <p class="dialog-privacy">
+          <span aria-hidden="true">●</span>
+          Local-only by design. No file contents leave this device.
+        </p>
+      </form>
+    </dialog>
+
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>

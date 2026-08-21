@@ -1,0 +1,24 @@
+{
+  "name": "HobbyHush - Imposter Game",
+  "short_name": "HobbyHush",
+  "description": "A fast imposter word game for friend groups, with hundreds of hobby categories.",
+  "start_url": "/hobbyhush/",
+  "scope": "/hobbyhush/",
+  "display": "standalone",
+  "background_color": "#101014",
+  "theme_color": "#C9FF4A",
+  "icons": [
+    {
+      "src": "/hobbyhush/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/hobbyhush/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
