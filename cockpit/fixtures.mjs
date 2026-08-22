@@ -11,6 +11,22 @@ const category = (id, name, world, rounds, installations, replayRate, reports, c
   color,
 });
 
+const categoryRating = (
+  categoryId,
+  name,
+  world,
+  ratingCount,
+  averageRating,
+  color,
+) => ({
+  categoryId,
+  name,
+  world,
+  ratingCount,
+  averageRating,
+  color,
+});
+
 export const DEMO_SCENARIOS = Object.freeze({
   healthy: {
     id: 'healthy',
@@ -51,6 +67,16 @@ export const DEMO_SCENARIOS = Object.freeze({
       category('music-music-production', 'Music production', 'Music', 82, 39, 0.33, 1, '#75E6C3'),
       category('studies-medicine', 'Medicine', 'Studies', 75, 34, 0.29, 3, '#FF84C6'),
       category('creative-pottery', 'Pottery', 'Creative', 68, 31, 0.26, 0, '#63E6FF'),
+    ],
+    categoryRatings: [
+      categoryRating('sport-football', 'Football', 'Sport', 58, 4.6, '#D8FF4F'),
+      categoryRating('gaming-minecraft', 'Minecraft', 'Gaming', 42, 4.3, '#AF8CFF'),
+      categoryRating('tabletop-dungeons-dragons', 'Dungeons & Dragons', 'Tabletop', 36, 4.7, '#FF725E'),
+      categoryRating('sport-padel', 'Padel', 'Sport', 39, 4.1, '#72A7FF'),
+      categoryRating('food-cocktails', 'Cocktails', 'Food & drink', 31, 3.3, '#FFC65A'),
+      categoryRating('music-music-production', 'Music production', 'Music', 28, 4.2, '#75E6C3'),
+      categoryRating('studies-medicine', 'Medicine', 'Studies', 27, 3.1, '#FF84C6'),
+      categoryRating('creative-pottery', 'Pottery', 'Creative', 12, 4.5, '#63E6FF'),
     ],
     mixes: [
       { name: 'Football + Padel', worlds: ['Sport'], rounds: 88, color: '#D8FF4F' },
@@ -110,6 +136,13 @@ export const DEMO_SCENARIOS = Object.freeze({
       category('food-cocktails', 'Cocktails', 'Food & drink', 27, 15, 0.2, 0, '#FFC65A'),
       category('tabletop-dungeons-dragons', 'Dungeons & Dragons', 'Tabletop', 22, 12, 0.25, 1, '#FF725E'),
     ],
+    categoryRatings: [
+      categoryRating('sport-football', 'Football', 'Sport', 11, 4.4, '#D8FF4F'),
+      categoryRating('gaming-minecraft', 'Minecraft', 'Gaming', 9, 4.2, '#AF8CFF'),
+      categoryRating('sport-padel', 'Padel', 'Sport', 8, 3.8, '#72A7FF'),
+      categoryRating('food-cocktails', 'Cocktails', 'Food & drink', 7, 3.5, '#FFC65A'),
+      categoryRating('tabletop-dungeons-dragons', 'Dungeons & Dragons', 'Tabletop', 6, 4.6, '#FF725E'),
+    ],
     mixes: [
       { name: 'Football + Padel', worlds: ['Sport'], rounds: 19, color: '#D8FF4F' },
       { name: 'D&D + Minecraft', worlds: ['Tabletop', 'Gaming'], rounds: 14, color: '#AF8CFF' },
@@ -158,12 +191,19 @@ export const DEMO_SCENARIOS = Object.freeze({
     categories: [
       category('gaming-minecraft', 'Minecraft', 'Gaming', 82, 41, 0.12, 2, '#AF8CFF'),
       category('sport-football', 'Football', 'Sport', 67, 39, 0.11, 1, '#D8FF4F'),
-      category('community-anime-lore', 'Anime lore', 'Community', 59, 31, 0.09, 9, '#FF725E'),
+      category('culture-anime', 'Anime', 'Culture', 59, 31, 0.09, 9, '#FF725E'),
       category('food-cocktails', 'Cocktails', 'Food & drink', 43, 28, 0.08, 2, '#FFC65A'),
       category('studies-medicine', 'Medicine', 'Studies', 37, 21, 0.1, 7, '#FF84C6'),
     ],
+    categoryRatings: [
+      categoryRating('gaming-minecraft', 'Minecraft', 'Gaming', 34, 3.2, '#AF8CFF'),
+      categoryRating('sport-football', 'Football', 'Sport', 32, 3.4, '#D8FF4F'),
+      categoryRating('culture-anime', 'Anime', 'Culture', 29, 2.6, '#FF725E'),
+      categoryRating('food-cocktails', 'Cocktails', 'Food & drink', 25, 3.0, '#FFC65A'),
+      categoryRating('studies-medicine', 'Medicine', 'Studies', 24, 2.8, '#FF84C6'),
+    ],
     mixes: [
-      { name: 'Minecraft + Anime lore', worlds: ['Gaming', 'Community'], rounds: 32, color: '#AF8CFF' },
+      { name: 'Minecraft + Anime', worlds: ['Gaming', 'Culture'], rounds: 32, color: '#AF8CFF' },
       { name: 'Football + Cocktails', worlds: ['Sport', 'Food & drink'], rounds: 18, color: '#FFC65A' },
       { name: 'Medicine + Biology', worlds: ['Studies'], rounds: 12, color: '#FF84C6' },
     ],

@@ -41,6 +41,10 @@
             <span class="nav-icon" aria-hidden="true">◇</span>
             Content
           </a>
+          <a class="nav-link" href="#ratings">
+            <span class="nav-icon" aria-hidden="true">★</span>
+            Ratings
+          </a>
           <a class="nav-link" href="#growth">
             <span class="nav-icon" aria-hidden="true">↗</span>
             Growth
@@ -93,7 +97,7 @@
             </label>
             <button class="button button-primary" type="button" id="open-import">
               <span aria-hidden="true">＋</span>
-              Import Play CSV
+              Import local CSV
             </button>
           </div>
         </header>
@@ -109,9 +113,14 @@
             <span><strong>Product events</strong><small>Fixture only · endpoint disabled</small></span>
           </div>
           <div class="source-divider" aria-hidden="true"></div>
+          <div class="source-item">
+            <span class="source-dot dot-rating" aria-hidden="true"></span>
+            <span><strong>Community ratings</strong><small id="rating-source-label">Synthetic category aggregates</small></span>
+          </div>
+          <div class="source-divider" aria-hidden="true"></div>
           <div class="source-item source-item-grow">
             <span class="source-dot dot-private" aria-hidden="true"></span>
-            <span><strong>Privacy boundary</strong><small>Installations, groups and rounds — never people</small></span>
+            <span><strong>Privacy boundary</strong><small>Aggregate rows only · no raw rating records</small></span>
           </div>
           <label class="state-preview">
             <span>Preview state</span>
@@ -135,7 +144,7 @@
         </div>
 
         <footer class="footer-note">
-          <span>Prototype v0.1</span>
+          <span>Prototype v0.2</span>
           <span aria-hidden="true">·</span>
           <span>Refresh target: daily</span>
           <span aria-hidden="true">·</span>
@@ -149,10 +158,12 @@
         <button class="dialog-close" type="submit" aria-label="Close dialog">×</button>
         <div class="dialog-icon" aria-hidden="true">CSV</div>
         <p class="eyebrow">Local import</p>
-        <h2 id="dialog-title">Add a Google Play snapshot</h2>
+        <h2 id="dialog-title">Add a local aggregate snapshot</h2>
         <p class="dialog-copy">
-          Choose a Statistics CSV exported from Play Console. It is parsed in this browser tab,
-          never uploaded, and discarded when the page closes.
+          Choose a Play Statistics CSV or a current category-rating aggregate CSV. Rating rows
+          accept only the 901 built-in main Hobby IDs plus count, average and optional complete
+          1–5 distribution. The file is parsed in this tab and never uploaded. Community, pack,
+          unknown, eligibility and history fields are not accepted.
         </p>
         <label class="drop-zone" for="csv-file" id="drop-zone">
           <span class="drop-icon" aria-hidden="true">⇧</span>
@@ -163,7 +174,10 @@
         <p id="import-feedback" class="import-feedback" role="status" aria-live="polite"></p>
         <div class="dialog-actions">
           <a class="button button-ghost" href="./sample-play-export.csv" download>
-            Download sample
+            Play sample
+          </a>
+          <a class="button button-ghost" href="./sample-category-ratings.csv" download>
+            Rating sample
           </a>
           <button class="button button-subtle" type="submit">Cancel</button>
         </div>

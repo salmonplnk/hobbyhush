@@ -1,3 +1,8 @@
+import {
+  BUILT_IN_MAIN_HOBBY_BY_ID,
+  BUILT_IN_MAIN_HOBBY_COUNT,
+} from './main-hobby-catalog.mjs';
+
 const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
 const PERCENT_FORMAT = new Intl.NumberFormat('en-US', {
   style: 'percent',
@@ -7,6 +12,16 @@ const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
   maximumFractionDigits: 2,
+});
+
+export const COMMUNITY_RATING_POLICY = Object.freeze({
+  scaleMinimum: 1,
+  scaleMaximum: 5,
+  minimumAggregateCohort: 5,
+  bayesianPriorWeight: 20,
+  publicScoreMinimumRatings: 10,
+  improvementMinimumRatings: 25,
+  improvementMaximumBayesianScore: 3.65,
 });
 
 export function formatNumber(value) {
@@ -68,6 +83,26 @@ export function parseCsv(text) {
 
 function normalizeHeader(value) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function detectOwnerCsvKind(rows) {
+  const headers = new Set(Object.keys(rows?.[0] ?? {}).map(normalizeHeader));
+  const hasAny = (aliases) => aliases.some((alias) => headers.has(normalizeHeader(alias)));
+  if (
+    hasAny(['Category ID', 'Hobby ID']) &&
+    hasAny(['Rating count', 'Ratings', 'Responses']) &&
+    hasAny(['Average rating', 'Average', 'Mean rating'])
+  ) {
+    return 'community-ratings';
+  }
+  if (
+    hasAny(['Daily Device Installs', 'Device installs', 'New device acquisitions', 'Downloads']) ||
+    hasAny(['Active Device Installs', 'Active devices']) ||
+    hasAny(['Store Listing Visitors', 'Store listing visitors'])
+  ) {
+    return 'play';
+  }
+  return 'unknown';
 }
 
 function findValue(row, aliases) {
@@ -225,4 +260,205 @@ export function calculateCampaignEconomics(campaigns = []) {
     roundsPerActivation: safeDivide(campaign.rounds, campaign.activations),
     referralYield: safeDivide(campaign.referredActivations, campaign.activations),
   }));
+}
+
+function normalizeCategoryRatingRecord(item, index) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    throw new Error(`Category rating row ${index + 1} must be an object.`);
+  }
+  if (Object.keys(item).some((key) => normalizeHeader(key).startsWith('pack'))) {
+    throw new Error('Pack-level ratings are not accepted. Import main Hobby category aggregates only.');
+  }
+
+  const unsupportedEvidenceFields = new Set([
+    'eligibleinstallations',
+    'eligibleusers',
+    'eligibleratinginstallations',
+    'previousaverage',
+    'previousperiodaverage',
+    'trend',
+  ]);
+  if (Object.keys(item).some((key) => unsupportedEvidenceFields.has(normalizeHeader(key)))) {
+    throw new Error('Eligibility counts, previous-period values and rating trends are not provided by the current owner contract.');
+  }
+
+  const label = item.name || item.categoryName || item.categoryId || `row ${index + 1}`;
+  const catalogEntry = BUILT_IN_MAIN_HOBBY_BY_ID.get(item.categoryId);
+  if (!catalogEntry) {
+    throw new Error(`${label}: categoryId must be one of the ${BUILT_IN_MAIN_HOBBY_COUNT} built-in main Hobby IDs.`);
+  }
+  if (!Number.isInteger(item.ratingCount) || item.ratingCount < 0) {
+    throw new Error(`${label}: rating count must be a non-negative integer.`);
+  }
+  if (
+    !Number.isFinite(item.averageRating) ||
+    item.averageRating < COMMUNITY_RATING_POLICY.scaleMinimum ||
+    item.averageRating > COMMUNITY_RATING_POLICY.scaleMaximum
+  ) {
+    throw new Error(`${label}: average rating must be from 1 to 5.`);
+  }
+
+  if (item.distribution !== undefined) {
+    const distribution = item.distribution;
+    const expectedKeys = ['1', '2', '3', '4', '5'];
+    if (
+      !distribution ||
+      typeof distribution !== 'object' ||
+      Array.isArray(distribution) ||
+      Object.keys(distribution).some((key) => !expectedKeys.includes(key)) ||
+      expectedKeys.some((key) => !Number.isInteger(distribution[key]) || distribution[key] < 0)
+    ) {
+      throw new Error(`${label}: distribution must contain non-negative integer counts for ratings 1 through 5.`);
+    }
+    const distributionTotal = expectedKeys.reduce((sum, key) => sum + distribution[key], 0);
+    if (distributionTotal !== item.ratingCount) {
+      throw new Error(`${label}: distribution total must equal rating count.`);
+    }
+    const distributionAverage = safeDivide(
+      expectedKeys.reduce((sum, key) => sum + Number(key) * distribution[key], 0),
+      distributionTotal,
+    );
+    if (distributionTotal > 0 && Math.abs(distributionAverage - item.averageRating) > 0.011) {
+      throw new Error(`${label}: average rating must match the 1–5 distribution.`);
+    }
+  }
+
+  return {
+    ...item,
+    name: catalogEntry.name,
+    world: catalogEntry.world,
+  };
+}
+
+/**
+ * Calculates category-level quality signals from the current owner aggregate contract.
+ * The contract contains current ratings only; it does not prove round eligibility or history.
+ */
+export function computeCommunityRatingAnalytics(categoryRatings = [], options = {}) {
+  if (!Array.isArray(categoryRatings)) {
+    throw new Error('Category ratings must be an array of aggregate rows.');
+  }
+  const normalizedRatings = categoryRatings.map(normalizeCategoryRatingRecord);
+
+  const ids = normalizedRatings.map((item) => item.categoryId);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error('Category rating aggregates must contain one row per main Hobby category.');
+  }
+
+  const ratingTotal = normalizedRatings.reduce((sum, item) => sum + item.ratingCount, 0);
+  const observedMean = safeDivide(
+    normalizedRatings.reduce((sum, item) => sum + item.averageRating * item.ratingCount, 0),
+    ratingTotal,
+  );
+  const priorMean = Number.isFinite(options.priorMean)
+    ? options.priorMean
+    : observedMean || 3.8;
+  const priorWeight = Number.isFinite(options.priorWeight)
+    ? Math.max(0, options.priorWeight)
+    : COMMUNITY_RATING_POLICY.bayesianPriorWeight;
+
+  const categories = normalizedRatings.map((item) => {
+    const bayesianScore = safeDivide(
+      item.averageRating * item.ratingCount + priorMean * priorWeight,
+      item.ratingCount + priorWeight,
+    );
+    const publicScoreEligible = item.ratingCount >= COMMUNITY_RATING_POLICY.publicScoreMinimumRatings;
+    return {
+      ...item,
+      bayesianScore,
+      qualityScore: Math.max(0, Math.min(100, ((bayesianScore - 1) / 4) * 100)),
+      confidence: publicScoreEligible ? 'high' : item.ratingCount >= 10 ? 'emerging' : 'early',
+      publicScoreEligible,
+    };
+  });
+
+  const ranking = [...categories].sort(
+    (left, right) => right.bayesianScore - left.bayesianScore || right.ratingCount - left.ratingCount,
+  );
+  const improvementQueue = categories
+    .filter((item) => (
+      item.ratingCount >= COMMUNITY_RATING_POLICY.improvementMinimumRatings &&
+      item.bayesianScore <= COMMUNITY_RATING_POLICY.improvementMaximumBayesianScore
+    ))
+    .sort((left, right) => left.bayesianScore - right.bayesianScore || right.ratingCount - left.ratingCount);
+
+  return {
+    categories,
+    ranking,
+    improvementQueue,
+    ratingTotal,
+    observedMean,
+    priorMean,
+    publicScoreEligibleCount: categories.filter((item) => item.publicScoreEligible).length,
+  };
+}
+
+/** Parse a local, already-aggregated category-rating CSV. Raw responses are out of scope. */
+export function deriveCommunityRatingMetrics(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('The category-rating CSV has no data rows.');
+  }
+  const headers = Object.keys(rows[0]).map(normalizeHeader);
+  if (headers.some((key) => key.startsWith('pack'))) {
+    throw new Error('Pack-level columns are not accepted. Use main Hobby category aggregates only.');
+  }
+  const unsupportedHeaders = new Set([
+    'eligibleinstallations',
+    'eligibleusers',
+    'eligibleratinginstallations',
+    'previousaverage',
+    'previousperiodaverage',
+    'trend',
+  ]);
+  if (headers.some((key) => unsupportedHeaders.has(key))) {
+    throw new Error('This CSV contains eligibility or trend fields that the current owner contract does not provide.');
+  }
+
+  const distributionAliases = [1, 2, 3, 4, 5].map((rating) => [
+    `Rating ${rating}`,
+    `${rating}-star ratings`,
+    `Distribution ${rating}`,
+  ]);
+  const hasAnyDistributionColumn = distributionAliases.some((aliases) => (
+    aliases.some((alias) => headers.includes(normalizeHeader(alias)))
+  ));
+  const hasEveryDistributionColumn = distributionAliases.every((aliases) => (
+    aliases.some((alias) => headers.includes(normalizeHeader(alias)))
+  ));
+  if (hasAnyDistributionColumn && !hasEveryDistributionColumn) {
+    throw new Error('Rating distribution columns must include all five ratings from 1 through 5.');
+  }
+
+  const seen = new Set();
+  let suppressedRows = 0;
+  const categories = rows.flatMap((row, index) => {
+    const categoryId = String(findValue(row, ['Category ID', 'Hobby ID', 'categoryId'])).trim();
+    const ratingCount = parseNumeric(findValue(row, ['Rating count', 'Ratings', 'Responses']));
+    const averageRating = parseNumeric(findValue(row, ['Average rating', 'Average', 'Mean rating']));
+    const distribution = hasAnyDistributionColumn
+      ? Object.fromEntries(distributionAliases.map((aliases, offset) => [
+        String(offset + 1),
+        parseNumeric(findValue(row, aliases)),
+      ]))
+      : undefined;
+    const item = {
+      categoryId,
+      ratingCount,
+      averageRating,
+      ...(distribution ? { distribution } : {}),
+    };
+    const normalizedItem = normalizeCategoryRatingRecord(item, index);
+    if (seen.has(categoryId)) throw new Error(`${normalizedItem.name}: duplicate category aggregate.`);
+    seen.add(categoryId);
+    if (ratingCount < COMMUNITY_RATING_POLICY.minimumAggregateCohort) {
+      suppressedRows += 1;
+      return [];
+    }
+    return [normalizedItem];
+  });
+
+  if (categories.length === 0) {
+    throw new Error('No category rows meet the minimum aggregate cohort of 5.');
+  }
+  return { categories, rowCount: rows.length, suppressedRows };
 }

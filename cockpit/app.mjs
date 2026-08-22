@@ -1,6 +1,10 @@
 import {
   calculateCampaignEconomics,
+  COMMUNITY_RATING_POLICY,
   computeDashboardMetrics,
+  computeCommunityRatingAnalytics,
+  detectOwnerCsvKind,
+  deriveCommunityRatingMetrics,
   derivePlayMetrics,
   evaluateQualityGates,
   formatMoney,
@@ -17,6 +21,7 @@ const periodSelect = document.querySelector('#period-select');
 const stateSelect = document.querySelector('#state-select');
 const rangeSummary = document.querySelector('#range-summary');
 const playSourceLabel = document.querySelector('#play-source-label');
+const ratingSourceLabel = document.querySelector('#rating-source-label');
 const statusAnnouncer = document.querySelector('#status-announcer');
 const dialog = document.querySelector('#csv-dialog');
 const fileInput = document.querySelector('#csv-file');
@@ -28,6 +33,7 @@ const appState = {
   period: 30,
   view: 'ready',
   importedPlay: null,
+  importedRatings: null,
   importName: '',
 };
 
@@ -76,6 +82,10 @@ function getCurrentData() {
     installations: scaleCount(item.installations, factor, 1),
     reports: scaleCount(item.reports, factor),
   }));
+  data.categoryRatings = data.categoryRatings.map((item) => ({
+    ...item,
+    ratingCount: scaleCount(item.ratingCount, factor, 1),
+  }));
   data.mixes = data.mixes.map((item) => ({ ...item, rounds: scaleCount(item.rounds, factor, 1) }));
   data.requests = data.requests.map((item) => ({ ...item, count: scaleCount(item.count, factor, 1) }));
   data.campaigns = data.campaigns.map((item) => ({
@@ -91,6 +101,13 @@ function getCurrentData() {
 
   if (appState.importedPlay) {
     data.play = { ...data.play, ...appState.importedPlay };
+  }
+  if (appState.importedRatings) {
+    const colors = ['#D8FF4F', '#AF8CFF', '#72A7FF', '#FF725E', '#FFC65A', '#75E6C3', '#FF84C6', '#63E6FF'];
+    data.categoryRatings = appState.importedRatings.categories.map((item, index) => ({
+      ...item,
+      color: colors[index % colors.length],
+    }));
   }
   return data;
 }
@@ -232,7 +249,7 @@ function renderKpis(data, metrics) {
 
 function renderFunnel(data) {
   const steps = [
-    { label: 'First open', value: data.funnel.firstOpen, rate: 1, note: 'eligible installs' },
+    { label: 'First open', value: data.funnel.firstOpen, rate: 1, note: 'synthetic fixture cohort' },
     {
       label: 'First round complete',
       value: data.funnel.firstRoundComplete,
@@ -297,6 +314,63 @@ function renderCategoryTable(data) {
     </section>`;
 }
 
+function renderCommunityRatings(analytics) {
+  const sourceCopy = appState.importedRatings
+    ? 'Local aggregate CSV preview; the private owner backend is still disconnected.'
+    : 'Synthetic category aggregates only until the private owner backend is live.';
+  return `
+    <section class="panel ratings-panel" id="ratings" aria-labelledby="ratings-title">
+      <div class="panel-head">
+        <div><p class="section-kicker">Community quality</p><h2 id="ratings-title">Main Hobby ratings</h2><p class="section-copy">${sourceCopy} No raw response, person or pack score is shown.</p></div>
+        <span class="panel-tag panel-tag-demo">${appState.importedRatings ? 'Local CSV demo' : 'Synthetic demo'}</span>
+      </div>
+      <div class="rating-summary" aria-label="Community rating summary">
+        <div class="rating-summary-item"><span>Current ratings</span><strong>${formatNumber(analytics.ratingTotal)}</strong><em>One current score per stored installation-Hobby pair</em></div>
+        <div class="rating-summary-item"><span>Rated categories</span><strong>${analytics.categories.length}<small>/901</small></strong><em>Owner rows start at ${COMMUNITY_RATING_POLICY.minimumAggregateCohort} ratings</em></div>
+        <div class="rating-summary-item"><span>Observed average</span><strong>${analytics.observedMean.toFixed(2)}<small>/5</small></strong><em>Before Bayesian shrinkage</em></div>
+        <div class="rating-summary-item"><span>Public-score ready</span><strong>${analytics.publicScoreEligibleCount}<small>/${analytics.categories.length}</small></strong><em>${COMMUNITY_RATING_POLICY.publicScoreMinimumRatings}+ ratings · score-neutral</em></div>
+      </div>
+      <div class="rating-policy-note">
+        <span aria-hidden="true">i</span>
+        <p><strong>Current owner contract:</strong> each built-in main Hobby row contains rating count, average and 1–5 distribution. It does not prove completed-round eligibility or provide eligible-installation counts or rating history. The owner cohort starts at ${COMMUNITY_RATING_POLICY.minimumAggregateCohort} ratings; a category score becomes public-visible from ${COMMUNITY_RATING_POLICY.publicScoreMinimumRatings}; improvement recommendations require ${COMMUNITY_RATING_POLICY.improvementMinimumRatings}. Bayesian scores use the snapshot mean with a ${COMMUNITY_RATING_POLICY.bayesianPriorWeight}-rating prior. Never rank or publish packs.</p>
+      </div>
+      <div class="table-scroll" tabindex="0" aria-label="Scrollable community category ratings table">
+        <table class="data-table rating-table">
+          <thead><tr><th scope="col">Quality rank</th><th scope="col" class="number-cell">Ratings</th><th scope="col" class="number-cell">Average</th><th scope="col" class="number-cell">Bayesian</th><th scope="col">Public score</th></tr></thead>
+          <tbody>
+            ${analytics.ranking.map((item, index) => `
+              <tr>
+                <td><div class="category-cell"><span class="rank">${String(index + 1).padStart(2, '0')}</span><i class="category-dot" style="--dot-color:${item.color}" aria-hidden="true"></i><span class="category-title"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.world)} · quality ${Math.round(item.qualityScore)}/100</span></span></div></td>
+                <td class="number-cell">${formatNumber(item.ratingCount)}</td>
+                <td class="number-cell">${item.averageRating.toFixed(1)}</td>
+                <td class="number-cell rating-score">${item.bayesianScore.toFixed(2)}</td>
+                <td><span class="public-score-state ${item.publicScoreEligible ? 'is-ready' : ''}">${item.publicScoreEligible ? `${item.bayesianScore.toFixed(2)} / 5` : `${COMMUNITY_RATING_POLICY.publicScoreMinimumRatings - item.ratingCount} more`}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </section>`;
+}
+
+function renderImprovementQueue(analytics) {
+  const sourceLabel = appState.importedRatings ? 'Local CSV preview; backend disconnected.' : 'Synthetic until backend launch.';
+  return `
+    <section class="panel" aria-labelledby="improvement-title">
+      <div class="panel-head">
+        <div><p class="section-kicker">Evidence queue</p><h2 id="improvement-title">Improve with confidence</h2><p class="section-copy">At least ${COMMUNITY_RATING_POLICY.improvementMinimumRatings} ratings and Bayesian score ≤ ${COMMUNITY_RATING_POLICY.improvementMaximumBayesianScore}. ${sourceLabel}</p></div>
+        <span class="panel-tag">${analytics.improvementQueue.length} queued</span>
+      </div>
+      ${analytics.improvementQueue.length ? `<ol class="improvement-list">
+        ${analytics.improvementQueue.map((item, index) => `
+          <li class="improvement-row">
+            <span class="improvement-rank">${String(index + 1).padStart(2, '0')}</span>
+            <div class="improvement-copy"><strong>${escapeHtml(item.name)}</strong><span>${formatNumber(item.ratingCount)} ratings · average ${item.averageRating.toFixed(1)} · Bayesian ${item.bayesianScore.toFixed(2)}</span><em>Audit this main category's clarity, closeness and replay value.</em></div>
+            <span class="confidence-pill">High confidence</span>
+          </li>`).join('')}
+      </ol>` : '<div class="queue-empty"><span aria-hidden="true">✓</span><div><strong>No high-confidence low scores</strong><p>Keep collecting current category ratings before changing content.</p></div></div>'}
+    </section>`;
+}
+
 function renderMixes(data) {
   const maximum = Math.max(...data.mixes.map((item) => item.rounds), 1);
   return `
@@ -318,8 +392,8 @@ function renderRequests(data) {
   return `
     <section class="panel" aria-labelledby="requests-title">
       <div class="panel-head">
-        <div><p class="section-kicker">Community demand</p><h2 id="requests-title">Requested categories</h2><p class="section-copy">Moderated normalized labels only; raw text stays out.</p></div>
-        <span class="panel-tag">${data.requests.reduce((sum, item) => sum + item.count, 0)} signals</span>
+        <div><p class="section-kicker">Community demand</p><h2 id="requests-title">Requested categories</h2><p class="section-copy">Synthetic moderated labels and aggregate trend only; raw request text stays out.</p></div>
+        <span class="panel-tag panel-tag-demo">Demo · ${data.requests.reduce((sum, item) => sum + item.count, 0)} signals</span>
       </div>
       <ol class="request-list">
         ${data.requests
@@ -334,7 +408,7 @@ function renderRequests(data) {
 function renderCampaigns(data) {
   const campaigns = calculateCampaignEconomics(data.campaigns);
   return `
-    <section class="panel" id="growth" aria-labelledby="campaigns-title">
+    <section class="panel panel-wide" id="growth" aria-labelledby="campaigns-title">
       <div class="panel-head">
         <div><p class="section-kicker">Attribution</p><h2 id="campaigns-title">Campaign economics</h2><p class="section-copy">Continue paid pilots only at ≥ 10 activations and ≤ $3 CPA.</p></div>
         <span class="panel-tag">Cohorts ≥ 5</span>
@@ -382,6 +456,7 @@ function renderQuality(data, gates) {
 function renderReady() {
   const data = getCurrentData();
   const metrics = computeDashboardMetrics(data);
+  const ratingAnalytics = computeCommunityRatingAnalytics(data.categoryRatings);
   const gates = evaluateQualityGates(data);
   root.setAttribute('aria-busy', 'false');
   root.innerHTML = `
@@ -393,8 +468,10 @@ function renderReady() {
         <section class="panel" aria-labelledby="trend-title"><div class="panel-head"><div><p class="section-kicker">Usage rhythm</p><h2 id="trend-title">Completed rounds</h2><p class="section-copy">Synthetic daily group-round trend.</p></div><span class="panel-tag">Daily</span></div>${trendChart(data.trend)}</section>
       </div>
       <div class="content-grid">${renderCategoryTable(data)}${renderMixes(data)}</div>
-      <div class="growth-grid">${renderCampaigns(data)}${renderRequests(data)}</div>
-      <div class="quality-grid">${renderQuality(data, gates)}<section class="panel" aria-labelledby="definitions-title"><div class="panel-head"><div><p class="section-kicker">Honest definitions</p><h2 id="definitions-title">What these numbers mean</h2><p class="section-copy">Downloads come from Play. Activated installations use a rotating monthly ID. Rounds describe group sessions. No metric represents people or players.</p></div><span class="panel-tag">Privacy first</span></div><div class="mix-list"><div class="mix-row"><div><div class="mix-name">Crash-free users</div><div class="mix-worlds">${formatPercent(data.play.crashFree)} from Play snapshot</div></div><span class="mix-value">Target 99.5%</span><div class="bar-track"><div class="bar-fill" style="--value:${Math.min(100, data.play.crashFree * 100)}%;--bar-color:#75E6C3"></div></div></div><div class="mix-row"><div><div class="mix-name">Serious reports</div><div class="mix-worlds">${formatNumber(data.seriousReports)} across ${formatNumber(data.completedRounds)} rounds</div></div><span class="mix-value">${formatPercent(metrics.seriousReportRate)}</span><div class="bar-track"><div class="bar-fill" style="--value:${Math.min(100, metrics.seriousReportRate * 4000)}%;--bar-color:#FF725E"></div></div></div></div></section></div>
+      ${renderCommunityRatings(ratingAnalytics)}
+      <div class="community-grid">${renderImprovementQueue(ratingAnalytics)}${renderRequests(data)}</div>
+      <div class="growth-grid">${renderCampaigns(data)}</div>
+      <div class="quality-grid">${renderQuality(data, gates)}<section class="panel" aria-labelledby="definitions-title"><div class="panel-head"><div><p class="section-kicker">Honest definitions</p><h2 id="definitions-title">What these numbers mean</h2><p class="section-copy">Downloads come from Play. Activated installations and rounds are synthetic product-event fixtures here; the rating owner route does not provide them. No metric represents people or players.</p></div><span class="panel-tag">Privacy first</span></div><div class="mix-list"><div class="mix-row"><div><div class="mix-name">Crash-free users</div><div class="mix-worlds">${formatPercent(data.play.crashFree)} from Play snapshot</div></div><span class="mix-value">Target 99.5%</span><div class="bar-track"><div class="bar-fill" style="--value:${Math.min(100, data.play.crashFree * 100)}%;--bar-color:#75E6C3"></div></div></div><div class="mix-row"><div><div class="mix-name">Serious reports</div><div class="mix-worlds">${formatNumber(data.seriousReports)} across ${formatNumber(data.completedRounds)} rounds</div></div><span class="mix-value">${formatPercent(metrics.seriousReportRate)}</span><div class="bar-track"><div class="bar-fill" style="--value:${Math.min(100, metrics.seriousReportRate * 4000)}%;--bar-color:#FF725E"></div></div></div></div></section></div>
     </div>`;
 }
 
@@ -405,7 +482,7 @@ function renderLoading() {
 
 function renderEmpty() {
   root.setAttribute('aria-busy', 'false');
-  root.innerHTML = `<section class="state-card"><div class="state-content"><div class="state-icon" aria-hidden="true">◇</div><h2>No aggregate data yet</h2><p>The shipped app remains analytics-free. Once consent, the endpoint and owner authentication are ready, eligible aggregate cohorts will appear here.</p><button class="button button-primary" type="button" data-action="show-demo">Return to demo data</button></div></section>`;
+  root.innerHTML = `<section class="state-card"><div class="state-content"><div class="state-icon" aria-hidden="true">◇</div><h2>No aggregate data yet</h2><p>The shipped app remains analytics-free. Once ratings are enabled and the private owner route is connected, current aggregate cohorts can appear here.</p><button class="button button-primary" type="button" data-action="show-demo">Return to demo data</button></div></section>`;
 }
 
 function renderError() {
@@ -418,6 +495,9 @@ function render() {
   playSourceLabel.textContent = appState.importedPlay
     ? `Local CSV · ${appState.importedPlay.rowCount} rows`
     : 'Synthetic snapshot';
+  ratingSourceLabel.textContent = appState.importedRatings
+    ? `Local aggregate CSV · ${appState.importedRatings.categories.length} categories`
+    : 'Synthetic category aggregates';
   if (appState.view === 'loading') renderLoading();
   else if (appState.view === 'empty') renderEmpty();
   else if (appState.view === 'error') renderError();
@@ -449,13 +529,18 @@ async function importCsv(file) {
   try {
     const text = await file.text();
     const rows = parseCsv(text);
-    const metrics = derivePlayMetrics(rows);
-    appState.importedPlay = metrics;
+    const isRatingCsv = detectOwnerCsvKind(rows) === 'community-ratings';
+    const metrics = isRatingCsv ? deriveCommunityRatingMetrics(rows) : derivePlayMetrics(rows);
+    if (isRatingCsv) appState.importedRatings = metrics;
+    else appState.importedPlay = metrics;
     appState.importName = file.name;
     appState.view = 'ready';
     stateSelect.value = 'ready';
-    importFeedback.textContent = `Imported ${metrics.rowCount} rows from ${file.name}. Nothing was uploaded.`;
-    statusAnnouncer.textContent = `Google Play snapshot imported locally from ${file.name}.`;
+    const suppression = isRatingCsv && metrics.suppressedRows
+      ? ` ${metrics.suppressedRows} sub-cohort row${metrics.suppressedRows === 1 ? ' was' : 's were'} suppressed.`
+      : '';
+    importFeedback.textContent = `Imported ${metrics.rowCount} ${isRatingCsv ? 'aggregate ' : ''}rows from ${file.name}.${suppression} Nothing was uploaded.`;
+    statusAnnouncer.textContent = `${isRatingCsv ? 'Community rating aggregates' : 'Google Play snapshot'} imported locally from ${file.name}.`;
     render();
   } catch (error) {
     importFeedback.textContent = error instanceof Error ? error.message : 'The CSV could not be read.';
@@ -466,6 +551,7 @@ async function importCsv(file) {
 scenarioSelect.addEventListener('change', (event) => {
   appState.scenario = event.target.value;
   appState.importedPlay = null;
+  appState.importedRatings = null;
   appState.importName = '';
   setView('ready', `${event.target.selectedOptions[0].text} synthetic scenario loaded.`);
 });
