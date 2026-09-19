@@ -684,6 +684,7 @@ const MAIN_HOBBY_CATALOG = Object.freeze([
   ["culture-nonfiction-books","Nonfiction Books","Culture"],
   ["culture-audiobooks","Audiobooks","Culture"],
   ["culture-history","History","Culture"],
+  ["culture-politics","Politics","Culture"],
   ["culture-ancient-history","Ancient History","Culture"],
   ["culture-medieval-history","Medieval History","Culture"],
   ["culture-military-history","Military History","Culture"],

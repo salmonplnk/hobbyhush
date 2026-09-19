@@ -14,6 +14,7 @@ import {
   safeDivide,
 } from './core.mjs';
 import { cloneScenario } from './fixtures.mjs';
+import { BUILT_IN_MAIN_HOBBY_COUNT } from './main-hobby-catalog.mjs';
 
 const root = document.querySelector('#dashboard-root');
 const scenarioSelect = document.querySelector('#scenario-select');
@@ -326,7 +327,7 @@ function renderCommunityRatings(analytics) {
       </div>
       <div class="rating-summary" aria-label="Community rating summary">
         <div class="rating-summary-item"><span>Current ratings</span><strong>${formatNumber(analytics.ratingTotal)}</strong><em>One current score per stored installation-Hobby pair</em></div>
-        <div class="rating-summary-item"><span>Rated categories</span><strong>${analytics.categories.length}<small>/901</small></strong><em>Owner rows start at ${COMMUNITY_RATING_POLICY.minimumAggregateCohort} ratings</em></div>
+        <div class="rating-summary-item"><span>Rated categories</span><strong>${analytics.categories.length}<small>/${BUILT_IN_MAIN_HOBBY_COUNT}</small></strong><em>Owner rows start at ${COMMUNITY_RATING_POLICY.minimumAggregateCohort} ratings</em></div>
         <div class="rating-summary-item"><span>Observed average</span><strong>${analytics.observedMean.toFixed(2)}<small>/5</small></strong><em>Before Bayesian shrinkage</em></div>
         <div class="rating-summary-item"><span>Public-score ready</span><strong>${analytics.publicScoreEligibleCount}<small>/${analytics.categories.length}</small></strong><em>${COMMUNITY_RATING_POLICY.publicScoreMinimumRatings}+ ratings · score-neutral</em></div>
       </div>
